@@ -47,7 +47,12 @@
       <canvas id="canvas"></canvas>
       <div class="status-pill" id="status">Not started</div>
     </div>
-    <button class="btn btn-primary" id="startBtn" style="margin-top: 16px;">Start camera</button>
+    <div style="display:flex; gap:12px; margin-top: 16px;">
+      <button class="btn btn-primary" id="startBtn">Start camera</button>
+      <button class="btn btn-secondary" id="captureBtn" disabled>Capture score</button>
+      <button class="btn btn-secondary" id="resumeBtn" style="display:none;">Resume live</button>
+    </div>
+    <a id="downloadLink" class="btn btn-secondary" style="display:none; margin-top: 12px;" download="posture-snapshot.png">Download snapshot</a>
   </div>
 
   <div>
@@ -71,7 +76,7 @@
 <footer><div class="container">Upright — built for the Congressional App Challenge.</div></footer>
 
 <script type="module">
-  import { initPoseDetection } from "../js/pose-detection.js";
+  import { initPoseDetection, pausePoseDetection, resumePoseDetection, captureSnapshot } from "../js/pose-detection.js";
   import { scorePosture } from "../js/scoring.js";
   import { EXERCISES, awarenessLevel, DISCLAIMER } from "../js/exercises-data.js";
 
@@ -79,6 +84,9 @@
   const canvas = document.getElementById("canvas");
   const statusPill = document.getElementById("status");
   const startBtn = document.getElementById("startBtn");
+  const captureBtn = document.getElementById("captureBtn");
+  const resumeBtn = document.getElementById("resumeBtn");
+  const downloadLink = document.getElementById("downloadLink");
   const scoreValue = document.getElementById("scoreValue");
   const scoreLabel = document.getElementById("scoreLabel");
   const issuesList = document.getElementById("issuesList");
@@ -86,8 +94,10 @@
 
   // Smooth the score slightly so it doesn't jitter frame to frame
   let smoothedScore = null;
+  let isPaused = false;
 
   function render(result) {
+    if (isPaused) return; // frozen - ignore incoming frames until resumed
     smoothedScore = smoothedScore === null ? result.score : smoothedScore * 0.85 + result.score * 0.15;
     const displayScore = Math.round(smoothedScore * 10) / 10;
 
@@ -143,6 +153,7 @@
         onResult: (landmarks) => render(scorePosture(landmarks)),
       });
       startBtn.textContent = "Camera running";
+      captureBtn.disabled = false;
     } catch (err) {
       statusPill.textContent = "Camera error";
       startBtn.textContent = "Try again";
@@ -150,6 +161,29 @@
       console.error(err);
       alert("Couldn't access the camera. Check permissions and try again.\n\n" + err.message);
     }
+  });
+
+  captureBtn.addEventListener("click", () => {
+    isPaused = true;
+    pausePoseDetection();
+    statusPill.textContent = "Paused — score frozen";
+    captureBtn.style.display = "none";
+    resumeBtn.style.display = "inline-flex";
+
+    const dataUrl = captureSnapshot();
+    if (dataUrl) {
+      downloadLink.href = dataUrl;
+      downloadLink.style.display = "inline-flex";
+    }
+  });
+
+  resumeBtn.addEventListener("click", () => {
+    isPaused = false;
+    resumePoseDetection();
+    statusPill.textContent = "Live";
+    captureBtn.style.display = "inline-flex";
+    resumeBtn.style.display = "none";
+    downloadLink.style.display = "none";
   });
 </script>
 

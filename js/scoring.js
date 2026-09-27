@@ -21,38 +21,65 @@ const LM = {
   RIGHT_HIP: 24,
 };
 
-/** Angle (degrees) of the line from hip to ear, measured from vertical.
- *  0 = perfectly upright. Larger = more forward head lean. */
+/**
+ * Angle (degrees) between the torso vector (hip -> shoulder) and the
+ * neck vector (shoulder -> ear), computed in full 3D.
+ *
+ * Using the angle between two BODY-relative vectors (rather than
+ * comparing the ear to a camera-relative "vertical") is what makes this
+ * work regardless of whether the camera sees you from the front or the
+ * side: slouching from the front mostly moves the head in z (depth,
+ * toward the camera), while slouching viewed from the side mostly moves
+ * the head in x. A 2D-only, x/y measurement (the original version of
+ * this function) misses the front-view case entirely. 0 = ear directly
+ * in line with the torso. Larger = more forward head lean.
+ */
 function forwardLeanAngle(landmarks) {
-  const ear = averagePoint(landmarks[LM.LEFT_EAR], landmarks[LM.RIGHT_EAR]);
-  const hip = averagePoint(landmarks[LM.LEFT_HIP], landmarks[LM.RIGHT_HIP]);
-  const dx = ear.x - hip.x;
-  const dy = hip.y - ear.y; // y grows downward in image coords
-  const radians = Math.atan2(Math.abs(dx), Math.abs(dy));
-  return radians * (180 / Math.PI);
+  const ear = averagePoint3D(landmarks[LM.LEFT_EAR], landmarks[LM.RIGHT_EAR]);
+  const shoulder = averagePoint3D(landmarks[LM.LEFT_SHOULDER], landmarks[LM.RIGHT_SHOULDER]);
+  const hip = averagePoint3D(landmarks[LM.LEFT_HIP], landmarks[LM.RIGHT_HIP]);
+
+  const torso = subtract3D(shoulder, hip);
+  const neck = subtract3D(ear, shoulder);
+  return angleBetween3D(torso, neck);
 }
 
-/** How far forward the ear sits relative to the shoulder, as a
- *  fraction of shoulder width. Classic "tech neck" signal. */
+/** 3D distance from the ear to the shoulder, normalized by shoulder
+ *  width, as a secondary "how far forward" signal (distance rather
+ *  than angle) — catches proportion differences an angle alone can miss. */
 function earShoulderOffset(landmarks) {
-  const ear = averagePoint(landmarks[LM.LEFT_EAR], landmarks[LM.RIGHT_EAR]);
-  const shoulder = averagePoint(landmarks[LM.LEFT_SHOULDER], landmarks[LM.RIGHT_SHOULDER]);
-  const shoulderWidth = distance(landmarks[LM.LEFT_SHOULDER], landmarks[LM.RIGHT_SHOULDER]) || 1;
-  return Math.abs(ear.x - shoulder.x) / shoulderWidth;
+  const ear = averagePoint3D(landmarks[LM.LEFT_EAR], landmarks[LM.RIGHT_EAR]);
+  const shoulder = averagePoint3D(landmarks[LM.LEFT_SHOULDER], landmarks[LM.RIGHT_SHOULDER]);
+  const shoulderWidth = distance3D(landmarks[LM.LEFT_SHOULDER], landmarks[LM.RIGHT_SHOULDER]) || 1;
+  // horizontal + depth offset only (ignore vertical, which is expected to differ)
+  const dx = ear.x - shoulder.x;
+  const dz = ear.z - shoulder.z;
+  return Math.hypot(dx, dz) / shoulderWidth;
 }
 
 /** Difference in shoulder height, as a fraction of shoulder width.
- *  Flags lateral (side-to-side) imbalance. */
+ *  Flags lateral (side-to-side) imbalance. Stays 2D on purpose - this
+ *  is about left/right tilt, which the image plane already captures. */
 function shoulderTilt(landmarks) {
-  const shoulderWidth = distance(landmarks[LM.LEFT_SHOULDER], landmarks[LM.RIGHT_SHOULDER]) || 1;
+  const shoulderWidth = distance3D(landmarks[LM.LEFT_SHOULDER], landmarks[LM.RIGHT_SHOULDER]) || 1;
   return Math.abs(landmarks[LM.LEFT_SHOULDER].y - landmarks[LM.RIGHT_SHOULDER].y) / shoulderWidth;
 }
 
-function averagePoint(a, b) {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+function averagePoint3D(a, b) {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: ((a.z || 0) + (b.z || 0)) / 2 };
 }
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+function subtract3D(a, b) {
+  return { x: a.x - b.x, y: a.y - b.y, z: (a.z || 0) - (b.z || 0) };
+}
+function distance3D(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0));
+}
+function angleBetween3D(v1, v2) {
+  const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+  const mag1 = Math.hypot(v1.x, v1.y, v1.z) || 1e-6;
+  const mag2 = Math.hypot(v2.x, v2.y, v2.z) || 1e-6;
+  const cos = clamp(dot / (mag1 * mag2), -1, 1);
+  return Math.acos(cos) * (180 / Math.PI);
 }
 
 /**
