@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exercise library — Upright</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .group { margin-bottom: 40px; }
+  .exercise-item { padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .exercise-item:last-child { border-bottom: none; }
+  .dose { color: var(--teal); font-weight: 600; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<nav class="site-nav">
+  <div class="container">
+    <a href="../index.html" class="brand">Upright</a>
+    <ul class="nav-links">
+      <li><a href="camera.html">Check my posture</a></li>
+      <li><a href="exercises.html" class="active">Exercises</a></li>
+      <li><a href="news.html">Articles</a></li>
+      <li><a href="about.html">Our goal</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container" style="padding: 40px 24px 80px;">
+  <h2>Exercise library</h2>
+  <p>These are the exercises Upright matches to specific posture patterns during a live check. You can also browse the full set here.</p>
+  <div id="groups"></div>
+</div>
+
+<footer><div class="container">Upright — built for the Congressional App Challenge.</div></footer>
+
+<script type="module">
+  import { EXERCISES } from "../js/exercises-data.js";
+  const titles = {
+    forward_head: "For forward head lean",
+    ear_forward: "For ears sitting ahead of shoulders",
+    shoulder_tilt: "For uneven shoulders",
+    good: "General maintenance",
+  };
+  const container = document.getElementById("groups");
+  Object.entries(EXERCISES).forEach(([key, list]) => {
+    const section = document.createElement("div");
+    section.className = "group card";
+    section.innerHTML = `<h3>${titles[key] || key}</h3>` + list.map(ex => `
+      <div class="exercise-item">
+        <h3 style="margin-bottom:2px; font-size:1.05rem;">${ex.name}</h3>
+        <div class="dose">${ex.dose}</div>
+        <p style="margin:6px 0 0;">${ex.how}</p>
+      </div>
+    `).join("");
+    container.appendChild(section);
+    container.appendChild(document.createElement("div")).style.height = "20px";
+  });
+</script>
+</body>
+</html>

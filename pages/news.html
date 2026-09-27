@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Articles — Upright</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .article-card { display: block; text-decoration: none; color: inherit; margin-bottom: 18px; }
+  .article-card:hover { border-color: var(--teal); }
+  .source { color: var(--ink-soft); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<nav class="site-nav">
+  <div class="container">
+    <a href="../index.html" class="brand">Upright</a>
+    <ul class="nav-links">
+      <li><a href="camera.html">Check my posture</a></li>
+      <li><a href="exercises.html">Exercises</a></li>
+      <li><a href="news.html" class="active">Articles</a></li>
+      <li><a href="about.html">Our goal</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container" style="padding: 40px 24px 80px; max-width: 760px;">
+  <h2>Posture & health articles</h2>
+  <p>A curated reading list on posture, screen time, and neck health. This list is maintained by hand — replace the entries below with articles you've found, or wire it up to a news API later.</p>
+
+  <div id="articles"></div>
+</div>
+
+<footer><div class="container">Upright — built for the Congressional App Challenge.</div></footer>
+
+<script>
+  // Replace with real articles you've read and want to recommend.
+  // Keep summaries short and in your own words — don't copy article text.
+  const ARTICLES = [
+    {
+      title: "Example: How screen time is changing kids' posture",
+      source: "Replace with real source",
+      summary: "One-sentence, original summary of what the article covers and why it's relevant.",
+      url: "#",
+    },
+    {
+      title: "Example: The physical therapy case for standing desks",
+      source: "Replace with real source",
+      summary: "One-sentence, original summary of what the article covers and why it's relevant.",
+      url: "#",
+    },
+  ];
+
+  document.getElementById("articles").innerHTML = ARTICLES.map(a => `
+    <a class="article-card card" href="${a.url}" target="_blank" rel="noopener">
+      <h3 style="margin-bottom:4px;">${a.title}</h3>
+      <div class="source">${a.source}</div>
+      <p style="margin-top:8px;">${a.summary}</p>
+    </a>
+  `).join("");
+</script>
+</body>
+</html>

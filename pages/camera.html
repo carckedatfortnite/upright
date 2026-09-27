@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Posture check — Upright</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .camera-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; padding: 40px 24px 80px; }
+  @media (max-width: 860px) { .camera-layout { grid-template-columns: 1fr; } }
+  .video-wrap { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: #000; aspect-ratio: 4/3; }
+  .video-wrap video { display: none; }
+  .video-wrap canvas { width: 100%; height: 100%; display: block; }
+  .status-pill { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,0.55); color: #fff; font-size: 0.8rem; padding: 5px 12px; border-radius: 20px; }
+  .issue-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .issue-row:last-child { border-bottom: none; }
+  .exercise-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .exercise-item:last-child { border-bottom: none; }
+  .dose { color: var(--teal); font-weight: 600; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="container">
+    <a href="../index.html" class="brand">Upright</a>
+    <ul class="nav-links">
+      <li><a href="camera.html" class="active">Check my posture</a></li>
+      <li><a href="exercises.html">Exercises</a></li>
+      <li><a href="news.html">Articles</a></li>
+      <li><a href="about.html">Our goal</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container" style="padding-top: 32px;">
+  <h2>Posture check</h2>
+  <p>Sit the way you normally would at your desk, then start the camera. Try a couple of positions — slouched, upright, leaning toward the screen — to see how the score responds.</p>
+</div>
+
+<div class="container camera-layout">
+  <div>
+    <div class="video-wrap">
+      <video id="video" playsinline></video>
+      <canvas id="canvas"></canvas>
+      <div class="status-pill" id="status">Not started</div>
+    </div>
+    <button class="btn btn-primary" id="startBtn" style="margin-top: 16px;">Start camera</button>
+  </div>
+
+  <div>
+    <div class="card" style="text-align:center; margin-bottom: 20px;">
+      <div id="scoreValue" class="score-badge score-warn">—</div>
+      <div id="scoreLabel" style="color: var(--ink-soft); font-weight: 600;">Waiting for a reading</div>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+      <h3>What we're seeing</h3>
+      <div id="issuesList"><p>Start the camera to get feedback.</p></div>
+    </div>
+
+    <div class="card">
+      <h3>Recommended for you</h3>
+      <div id="exerciseList"><p>Exercises will appear here based on your posture check.</p></div>
+    </div>
+  </div>
+</div>
+
+<footer><div class="container">Upright — built for the Congressional App Challenge.</div></footer>
+
+<script type="module">
+  import { initPoseDetection } from "../js/pose-detection.js";
+  import { scorePosture } from "../js/scoring.js";
+  import { EXERCISES, awarenessLevel, DISCLAIMER } from "../js/exercises-data.js";
+
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const statusPill = document.getElementById("status");
+  const startBtn = document.getElementById("startBtn");
+  const scoreValue = document.getElementById("scoreValue");
+  const scoreLabel = document.getElementById("scoreLabel");
+  const issuesList = document.getElementById("issuesList");
+  const exerciseList = document.getElementById("exerciseList");
+
+  // Smooth the score slightly so it doesn't jitter frame to frame
+  let smoothedScore = null;
+
+  function render(result) {
+    smoothedScore = smoothedScore === null ? result.score : smoothedScore * 0.85 + result.score * 0.15;
+    const displayScore = Math.round(smoothedScore * 10) / 10;
+
+    scoreValue.textContent = displayScore.toFixed(1);
+    scoreValue.className = "score-badge " + (result.label === "good" ? "score-good" : result.label === "fair" ? "score-warn" : "score-bad");
+    scoreLabel.textContent = result.label === "good" ? "Good posture" : result.label === "fair" ? "Room to improve" : "Needs attention";
+
+    if (result.issues.length === 0) {
+      issuesList.innerHTML = `<p style="margin:0;">No major issues detected in this position.</p>`;
+      exerciseList.innerHTML = renderExercises(EXERCISES.good);
+    } else {
+      issuesList.innerHTML = result.issues.map(i => `
+        <div class="issue-row">
+          <strong style="color: var(--coral);">•</strong>
+          <span>${i.message}</span>
+        </div>
+      `).join("");
+
+      const aware = awarenessLevel(result.issues);
+      issuesList.innerHTML += `
+        <div class="issue-row" style="margin-top:8px; padding-top:14px; border-top: 1px dashed var(--border);">
+          <div>
+            <strong>Awareness level: ${aware.level}</strong>
+            <p style="margin:4px 0 0;">${aware.detail}</p>
+            <p style="margin:6px 0 0; font-size:0.8rem; font-style:italic;">${DISCLAIMER}</p>
+          </div>
+        </div>
+      `;
+
+      const topIssue = result.issues[0].id;
+      exerciseList.innerHTML = renderExercises(EXERCISES[topIssue] || EXERCISES.good);
+    }
+  }
+
+  function renderExercises(list) {
+    return list.map(ex => `
+      <div class="exercise-item">
+        <h3 style="margin-bottom:2px; font-size:1.05rem;">${ex.name}</h3>
+        <div class="dose">${ex.dose}</div>
+        <p style="margin:6px 0 0;">${ex.how}</p>
+      </div>
+    `).join("");
+  }
+
+  startBtn.addEventListener("click", async () => {
+    startBtn.disabled = true;
+    startBtn.textContent = "Starting…";
+    try {
+      await initPoseDetection({
+        videoEl: video,
+        canvasEl: canvas,
+        onStatus: (s) => (statusPill.textContent = s),
+        onResult: (landmarks) => render(scorePosture(landmarks)),
+      });
+      startBtn.textContent = "Camera running";
+    } catch (err) {
+      statusPill.textContent = "Camera error";
+      startBtn.textContent = "Try again";
+      startBtn.disabled = false;
+      console.error(err);
+      alert("Couldn't access the camera. Check permissions and try again.\n\n" + err.message);
+    }
+  });
+</script>
+
+</body>
+</html>
