@@ -47,11 +47,13 @@
       <canvas id="canvas"></canvas>
       <div class="status-pill" id="status">Not started</div>
     </div>
-    <div style="display:flex; gap:12px; margin-top: 16px;">
+    <div style="display:flex; gap:12px; margin-top: 16px; flex-wrap: wrap;">
       <button class="btn btn-primary" id="startBtn">Start camera</button>
+      <button class="btn btn-secondary" id="calibrateBtn" disabled>Calibrate (sit up straight first)</button>
       <button class="btn btn-secondary" id="captureBtn" disabled>Capture score</button>
       <button class="btn btn-secondary" id="resumeBtn" style="display:none;">Resume live</button>
     </div>
+    <p id="calibrationStatus" style="font-size:0.85rem; margin-top:8px;">Not calibrated yet — using generic thresholds (less accurate, especially from a front-facing camera).</p>
     <a id="downloadLink" class="btn btn-secondary" style="display:none; margin-top: 12px;" download="posture-snapshot.png">Download snapshot</a>
   </div>
 
@@ -77,13 +79,15 @@
 
 <script type="module">
   import { initPoseDetection, pausePoseDetection, resumePoseDetection, captureSnapshot } from "../js/pose-detection.js";
-  import { scorePosture } from "../js/scoring.js";
+  import { scorePosture, computeMetrics } from "../js/scoring.js";
   import { EXERCISES, awarenessLevel, DISCLAIMER } from "../js/exercises-data.js";
 
   const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
   const statusPill = document.getElementById("status");
   const startBtn = document.getElementById("startBtn");
+  const calibrateBtn = document.getElementById("calibrateBtn");
+  const calibrationStatus = document.getElementById("calibrationStatus");
   const captureBtn = document.getElementById("captureBtn");
   const resumeBtn = document.getElementById("resumeBtn");
   const downloadLink = document.getElementById("downloadLink");
@@ -95,6 +99,8 @@
   // Smooth the score slightly so it doesn't jitter frame to frame
   let smoothedScore = null;
   let isPaused = false;
+  let baseline = null;      // set once the person calibrates
+  let latestLandmarks = null; // kept so the calibrate button can read "right now"
 
   function render(result) {
     if (isPaused) return; // frozen - ignore incoming frames until resumed
@@ -150,10 +156,14 @@
         videoEl: video,
         canvasEl: canvas,
         onStatus: (s) => (statusPill.textContent = s),
-        onResult: (landmarks) => render(scorePosture(landmarks)),
+        onResult: (landmarks) => {
+          latestLandmarks = landmarks;
+          render(scorePosture(landmarks, baseline));
+        },
       });
       startBtn.textContent = "Camera running";
       captureBtn.disabled = false;
+      calibrateBtn.disabled = false;
     } catch (err) {
       statusPill.textContent = "Camera error";
       startBtn.textContent = "Try again";
@@ -161,6 +171,13 @@
       console.error(err);
       alert("Couldn't access the camera. Check permissions and try again.\n\n" + err.message);
     }
+  });
+
+  calibrateBtn.addEventListener("click", () => {
+    if (!latestLandmarks) return;
+    baseline = computeMetrics(latestLandmarks);
+    calibrationStatus.textContent = "Calibrated to your neutral posture — scoring is now personalized and should work from any camera angle.";
+    calibrationStatus.style.color = "var(--good)";
   });
 
   captureBtn.addEventListener("click", () => {
