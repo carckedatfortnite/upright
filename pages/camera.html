@@ -5,32 +5,52 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Posture check — Upright</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css">
 <style>
   .camera-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; padding: 24px 24px 80px; }
   @media (max-width: 860px) { .camera-layout { grid-template-columns: 1fr; } }
-  .video-wrap { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: #000; aspect-ratio: 4/3; }
+  .video-wrap { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: #000; aspect-ratio: 4/3; box-shadow: 0 0 0 1px rgba(61,217,200,0.08), 0 0 40px rgba(61,217,200,0.06); }
   .video-wrap video { display: none; }
   .video-wrap canvas { width: 100%; height: 100%; display: block; }
-  .status-pill { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,0.55); color: #fff; font-size: 0.8rem; padding: 5px 12px; border-radius: 20px; }
+  .status-pill { position: absolute; top: 14px; left: 14px; background: rgba(6,16,13,0.7); color: var(--ink); font-size: 0.78rem; font-family: var(--font-mono); letter-spacing: 0.03em; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); z-index: 3; }
+  .facing-pill { position: absolute; top: 14px; right: 14px; font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.03em; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); z-index: 3; background: rgba(6,16,13,0.7); }
+  .facing-pill.match { color: var(--teal); border-color: var(--teal); }
+  .facing-pill.nomatch { color: var(--ink-soft); }
+
+  .hold-ring-wrap { position:absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 3; text-align:center; }
+  .hold-bar { width: 180px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.15); overflow:hidden; margin-top:6px; }
+  .hold-bar-fill { height:100%; width:0%; background: var(--teal); box-shadow: 0 0 10px var(--teal); transition: width 0.05s linear; }
+  .hold-caption { font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink); background: rgba(6,16,13,0.7); padding: 3px 10px; border-radius: 10px; display:inline-block; }
+
+  .spin-progress { width: 100%; height: 8px; border-radius: 4px; background: var(--border); overflow:hidden; margin: 14px 0; }
+  .spin-progress-fill { height: 100%; width:0%; background: var(--teal); box-shadow: 0 0 10px var(--teal); transition: width 0.1s linear; }
 
   .stepper { display:flex; gap:8px; margin-bottom: 18px; }
   .step-dot { width: 32px; height: 6px; border-radius: 3px; background: var(--border); }
-  .step-dot.done { background: var(--teal); }
-  .step-dot.current { background: var(--coral); }
+  .step-dot.done { background: var(--teal); box-shadow: 0 0 8px rgba(61,217,200,0.6); }
+  .step-dot.current { background: var(--coral); box-shadow: 0 0 8px rgba(255,106,77,0.6); }
 
   .issue-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .issue-row:last-child { border-bottom: none; }
   .exercise-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
   .exercise-item:last-child { border-bottom: none; }
-  .dose { color: var(--teal); font-weight: 600; font-size: 0.85rem; }
+  .dose { color: var(--teal); font-weight: 600; font-size: 0.85rem; font-family: var(--font-mono); }
   .care-link { display:flex; justify-content: space-between; align-items:center; padding: 12px 0; border-bottom: 1px solid var(--border); text-decoration:none; color: inherit; }
   .care-link:last-child { border-bottom: none; }
-  .care-link:hover .care-arrow { color: var(--teal-dark); }
   .care-arrow { color: var(--teal); font-weight: 600; }
-  .view-score { display:flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .view-score { display:flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; font-family: var(--font-mono); }
   .view-score:last-child { border-bottom: none; }
+
+  .thumb-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 760px) { .thumb-grid { grid-template-columns: 1fr; } }
+  .thumb-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .thumb-img-wrap { position: relative; aspect-ratio: 4/3; background:#000; }
+  .thumb-img-wrap img { width:100%; height:100%; object-fit: cover; display:block; }
+  .thumb-label { position:absolute; top:8px; left:8px; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; color: var(--teal); background: rgba(6,16,13,0.7); padding: 3px 9px; border-radius: 12px; border: 1px solid var(--border); z-index:2; }
+  .thumb-meta { padding: 10px 14px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); display:flex; justify-content: space-between; }
+
+  .override-link { background:none; border:none; color: var(--ink-soft); text-decoration: underline; font-size: 0.85rem; cursor:pointer; font-family: var(--font-body); padding: 0; }
 </style>
 </head>
 <body>
@@ -49,7 +69,7 @@
 
 <div class="container" style="padding-top: 32px;">
   <h2 id="stepTitle">Posture check</h2>
-  <p id="stepInstruction">We'll walk through a quick 360° check: calibrate, then face the camera, then turn to each side, so the score reflects your posture from every angle — not just one.</p>
+  <p id="stepInstruction">We'll do a quick 360° calibration spin, then automatically capture your front, left, and right posture — no buttons to hunt for, just hold each position for a moment.</p>
 </div>
 
 <div class="container">
@@ -58,117 +78,137 @@
 
 <div class="container camera-layout" id="captureLayout">
   <div>
-    <div class="video-wrap">
+    <div class="video-wrap viewfinder">
       <video id="video" playsinline></video>
       <canvas id="canvas"></canvas>
-      <div class="status-pill" id="status">Not started</div>
+      <div class="status-pill" id="status"><span class="live-dot" id="liveDot" style="display:none;"></span><span id="statusText">Not started</span></div>
+      <div class="facing-pill" id="facingPill" style="display:none;">—</div>
+      <div class="hold-ring-wrap" id="holdRing" style="display:none;">
+        <span class="hold-caption" id="holdCaption">Hold still…</span>
+        <div class="hold-bar"><div class="hold-bar-fill" id="holdBarFill"></div></div>
+      </div>
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
     </div>
-    <div style="display:flex; gap:12px; margin-top: 16px; flex-wrap: wrap;">
+
+    <div style="margin-top: 16px;">
       <button class="btn btn-primary" id="startBtn">Start camera</button>
-      <button class="btn btn-primary" id="actionBtn" style="display:none;">Calibrate</button>
+      <button class="btn btn-primary" id="spinBtn" style="display:none;">Start calibration spin (8s)</button>
     </div>
+    <div class="spin-progress" id="spinProgress" style="display:none;"><div class="spin-progress-fill" id="spinProgressFill"></div></div>
+    <p id="spinStatus" style="display:none; font-size:0.85rem;"></p>
+
+    <p style="margin-top:10px;">
+      <button class="override-link" id="overrideBtn" style="display:none;">Trouble auto-detecting? Capture now instead</button>
+    </p>
   </div>
 
   <div class="card">
     <h3>Why this step</h3>
-    <p id="whyText">Calibrating to your own neutral posture makes every later reading more accurate — slouching looks different on every body and every camera setup, so a generic threshold is a rough guess without this.</p>
+    <p id="whyText">A 360° spin lets the app learn what YOUR good posture looks like from every angle, not just face-on — so later, your left-side score is judged against what good posture looks like for your left side, not a generic front-facing guess.</p>
   </div>
 </div>
 
-<div class="container" id="resultsLayout" style="display:none; padding: 0 24px 80px; display:grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-  <div>
-    <div class="card" style="text-align:center; margin-bottom: 20px;">
-      <div id="scoreValue" class="score-badge score-warn">—</div>
-      <div id="scoreLabel" style="color: var(--ink-soft); font-weight: 600;">Combined score across all 3 views</div>
-    </div>
+<div class="container" id="resultsLayout" style="display:none; padding: 0 24px 80px;">
+  <div class="thumb-grid" id="thumbGrid"></div>
 
-    <div class="card" style="margin-bottom: 20px;">
-      <h3>Per-view breakdown</h3>
-      <div id="viewBreakdown"></div>
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+    <div>
+      <div class="card" style="text-align:center; margin-bottom: 20px;">
+        <div id="scoreValue" class="score-badge score-warn">—</div>
+        <div id="scoreLabel" style="color: var(--ink-soft); font-weight: 600; font-family: var(--font-mono); font-size: 0.85rem; letter-spacing:0.04em;">COMBINED SCORE — ALL 3 VIEWS</div>
+      </div>
+      <div class="card" style="margin-bottom: 20px;">
+        <h3>Per-view breakdown</h3>
+        <div id="viewBreakdown"></div>
+      </div>
+      <div class="card">
+        <h3>What we're seeing</h3>
+        <div id="issuesList"></div>
+      </div>
     </div>
-
-    <div class="card">
-      <h3>What we're seeing</h3>
-      <div id="issuesList"></div>
+    <div>
+      <div class="card" style="margin-bottom: 20px;">
+        <h3>Recommended exercises</h3>
+        <div id="exerciseList"></div>
+      </div>
+      <div class="card" style="margin-bottom: 20px;">
+        <h3>Suggested screenings</h3>
+        <div id="screeningsList"></div>
+      </div>
+      <div class="card">
+        <h3>Find care near you</h3>
+        <div id="careLinks"></div>
+      </div>
     </div>
-  </div>
-
-  <div>
-    <div class="card" style="margin-bottom: 20px;">
-      <h3>Recommended exercises</h3>
-      <div id="exerciseList"></div>
+    <div style="grid-column: 1 / -1; text-align:center;">
+      <button class="btn btn-secondary" id="restartBtn">Start a new check</button>
     </div>
-
-    <div class="card" style="margin-bottom: 20px;">
-      <h3>Suggested screenings</h3>
-      <div id="screeningsList"></div>
-    </div>
-
-    <div class="card">
-      <h3>Find care near you</h3>
-      <div id="careLinks"></div>
-    </div>
-  </div>
-
-  <div style="grid-column: 1 / -1; text-align:center;">
-    <button class="btn btn-secondary" id="restartBtn">Start a new check</button>
   </div>
 </div>
 
 <footer><div class="container">Upright — built by Gagan Girish for the Congressional App Challenge.</div></footer>
 
 <script type="module">
-  import { initPoseDetection } from "../js/pose-detection.js";
-  import { scorePosture, computeMetrics } from "../js/scoring.js";
+  import { initPoseDetection, captureSnapshot } from "../js/pose-detection.js";
+  import { scorePosture, computeMetrics, detectFacing } from "../js/scoring.js";
+  import { annotateFrame } from "../js/annotate.js";
   import {
     EXERCISES, SCREENINGS, CARE_CATEGORIES, ISSUE_TO_CARE,
     mapsSearchUrl, DISCLAIMER,
   } from "../js/exercises-data.js";
 
+  const HOLD_MS = 3000;
+  const SPIN_MS = 8000;
+
   const STEPS = [
-    {
-      id: "calibrate", title: "Step 1 — Calibrate",
-      instruction: "Sit up as straight and neutral as you feels natural, facing the camera. This becomes your personal baseline.",
-      why: "Calibrating to your own neutral posture makes every later reading more accurate — slouching looks different on every body and every camera setup, so a generic threshold is a rough guess without this.",
-      actionLabel: "Calibrate",
-    },
-    {
-      id: "front", title: "Step 2 — Front view",
-      instruction: "Now sit however feels normal to you — the way you'd actually sit while working, not posed. We'll capture this as your front-view reading.",
-      why: "Front view is the most common camera angle (laptop webcams, phone propped up) — the view most people actually use day to day.",
-      actionLabel: "Capture front view",
-    },
-    {
-      id: "left", title: "Step 3 — Left side",
-      instruction: "Turn your chair or body about 90° so the camera sees your left side, sitting naturally.",
-      why: "Side views are the most reliable angle for detecting forward head lean — the classic 'tech neck' posture shows up clearly here.",
-      actionLabel: "Capture left side",
-    },
-    {
-      id: "right", title: "Step 4 — Right side",
-      instruction: "Now turn the other way so the camera sees your right side.",
-      why: "Checking both sides catches asymmetric issues — like one shoulder riding higher than the other — that a single side can miss.",
-      actionLabel: "Capture right side",
-    },
-    { id: "results", title: "Your results", instruction: "", why: "" },
+    { id: "calibrate", title: "Step 1 — Calibration spin",
+      why: "A 360° spin lets the app learn what YOUR good posture looks like from every angle, not just face-on — so later, your left-side score is judged against what good posture looks like for your left side, not a generic front-facing guess." },
+    { id: "front", title: "Step 2 — Front view", facing: "front",
+      why: "Front view is the most common camera angle (laptop webcams, phone propped up) — the view most people actually use day to day." },
+    { id: "left", title: "Step 3 — Left side", facing: "left",
+      why: "Side views are the most reliable angle for detecting forward head lean — the classic 'tech neck' posture shows up clearly here." },
+    { id: "right", title: "Step 4 — Right side", facing: "right",
+      why: "Checking both sides catches asymmetric issues — like one shoulder riding higher than the other — that a single side can miss." },
+    { id: "results", title: "Your results" },
   ];
 
   let stepIndex = 0;
-  let baseline = null;
+  let baseline = null; // { front: {...}, left: {...}, right: {...} }
   let latestLandmarks = null;
-  const captures = {}; // { front: result, left: result, right: result }
+  let capturing = false;
+  let holdStart = null;
+  const captures = {};
+
+  // Calibration spin state
+  let spinning = false;
+  let spinStartTime = null;
+  const spinSamples = { front: [], left: [], right: [] };
 
   const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
-  const statusPill = document.getElementById("status");
+  const liveDot = document.getElementById("liveDot");
+  const statusText = document.getElementById("statusText");
+  const facingPill = document.getElementById("facingPill");
+  const holdRing = document.getElementById("holdRing");
+  const holdCaption = document.getElementById("holdCaption");
+  const holdBarFill = document.getElementById("holdBarFill");
   const startBtn = document.getElementById("startBtn");
-  const actionBtn = document.getElementById("actionBtn");
+  const spinBtn = document.getElementById("spinBtn");
+  const spinProgress = document.getElementById("spinProgress");
+  const spinProgressFill = document.getElementById("spinProgressFill");
+  const spinStatus = document.getElementById("spinStatus");
+  const overrideBtn = document.getElementById("overrideBtn");
   const stepTitle = document.getElementById("stepTitle");
   const stepInstruction = document.getElementById("stepInstruction");
   const whyText = document.getElementById("whyText");
   const stepperEl = document.getElementById("stepper");
   const captureLayout = document.getElementById("captureLayout");
   const resultsLayout = document.getElementById("resultsLayout");
+
+  function setStatus(s) {
+    statusText.textContent = s;
+    liveDot.style.display = s.toLowerCase() === "live" ? "inline-block" : "none";
+  }
 
   function renderStepper() {
     stepperEl.innerHTML = STEPS.slice(0, 4).map((s, i) => {
@@ -181,10 +221,13 @@
     stepIndex = i;
     const step = STEPS[i];
     renderStepper();
+    holdRing.style.display = "none";
+    overrideBtn.style.display = "none";
+    holdStart = null;
 
     if (step.id === "results") {
       captureLayout.style.display = "none";
-      resultsLayout.style.display = "grid";
+      resultsLayout.style.display = "block";
       stepTitle.textContent = step.title;
       stepInstruction.textContent = "";
       renderResults();
@@ -192,9 +235,16 @@
     }
 
     stepTitle.textContent = step.title;
-    stepInstruction.textContent = step.instruction;
     whyText.textContent = step.why;
-    actionBtn.textContent = step.actionLabel;
+
+    if (step.id === "calibrate") {
+      stepInstruction.textContent = "Click below, then slowly spin a full circle in your chair — front, left side, back, right side, back to front — moving smoothly over about 8 seconds.";
+      spinBtn.style.display = "inline-flex";
+    } else {
+      stepInstruction.textContent = `Turn to show the camera your ${step.facing === "front" ? "front" : step.facing + " side"}. Hold still once you're there — it captures automatically.`;
+      facingPill.style.display = "inline-block";
+      overrideBtn.style.display = "inline-block";
+    }
   }
 
   startBtn.addEventListener("click", async () => {
@@ -204,33 +254,30 @@
       await initPoseDetection({
         videoEl: video,
         canvasEl: canvas,
-        onStatus: (s) => (statusPill.textContent = s),
-        onResult: (landmarks) => { latestLandmarks = landmarks; },
+        onStatus: setStatus,
+        onResult: handleFrame,
       });
       startBtn.style.display = "none";
-      actionBtn.style.display = "inline-flex";
       goToStep(0);
     } catch (err) {
-      statusPill.textContent = "Camera error";
+      setStatus("Camera error");
       startBtn.textContent = "Try again";
       startBtn.disabled = false;
       alert("Couldn't access the camera. Check permissions and try again.\n\n" + err.message);
     }
   });
 
-  actionBtn.addEventListener("click", () => {
-    if (!latestLandmarks) {
-      alert("Still waiting for a clear view of you — make sure you're fully in frame.");
-      return;
-    }
-    const step = STEPS[stepIndex];
-    if (step.id === "calibrate") {
-      baseline = computeMetrics(latestLandmarks);
-      goToStep(stepIndex + 1);
-    } else {
-      captures[step.id] = scorePosture(latestLandmarks, baseline);
-      goToStep(stepIndex + 1);
-    }
+  spinBtn.addEventListener("click", () => {
+    spinning = true;
+    spinStartTime = performance.now();
+    spinSamples.front = []; spinSamples.left = []; spinSamples.right = [];
+    spinBtn.style.display = "none";
+    spinProgress.style.display = "block";
+    spinStatus.style.display = "block";
+  });
+
+  overrideBtn.addEventListener("click", () => {
+    if (latestLandmarks && !capturing) doCapture(latestLandmarks);
   });
 
   document.getElementById("restartBtn").addEventListener("click", () => {
@@ -241,9 +288,96 @@
     goToStep(0);
   });
 
+  function handleFrame(landmarks) {
+    latestLandmarks = landmarks;
+    const step = STEPS[stepIndex];
+
+    if (step.id === "calibrate") {
+      if (!spinning) return;
+      const elapsed = performance.now() - spinStartTime;
+      const pct = Math.min(100, (elapsed / SPIN_MS) * 100);
+      spinProgressFill.style.width = pct + "%";
+      const facing = detectFacing(landmarks);
+      if (spinSamples[facing]) spinSamples[facing].push(computeMetrics(landmarks));
+      spinStatus.textContent = `Detected: ${facing.toUpperCase()}  ·  samples — front ${spinSamples.front.length}, left ${spinSamples.left.length}, right ${spinSamples.right.length}`;
+      if (elapsed >= SPIN_MS) finishSpin();
+      return;
+    }
+
+    if (!step.facing || capturing) return;
+
+    const facing = detectFacing(landmarks);
+    const matches = facing === step.facing;
+    facingPill.textContent = facing.toUpperCase();
+    facingPill.className = "facing-pill " + (matches ? "match" : "nomatch");
+
+    if (matches) {
+      if (holdStart === null) holdStart = performance.now();
+      const elapsed = performance.now() - holdStart;
+      const remaining = Math.max(0, HOLD_MS - elapsed);
+      holdRing.style.display = "block";
+      holdCaption.textContent = `Hold still — capturing in ${Math.ceil(remaining / 1000)}…`;
+      holdBarFill.style.width = `${(elapsed / HOLD_MS) * 100}%`;
+      if (elapsed >= HOLD_MS) {
+        holdStart = null;
+        doCapture(landmarks);
+      }
+    } else {
+      holdStart = null;
+      holdRing.style.display = "none";
+    }
+  }
+
+  function averageMetrics(samples) {
+    if (!samples.length) return null;
+    const sum = samples.reduce((acc, m) => ({
+      leanAngle: acc.leanAngle + m.leanAngle,
+      earOffset: acc.earOffset + m.earOffset,
+      tilt: acc.tilt + m.tilt,
+      earRatio: acc.earRatio + m.earRatio,
+    }), { leanAngle: 0, earOffset: 0, tilt: 0, earRatio: 0 });
+    const n = samples.length;
+    return { leanAngle: sum.leanAngle / n, earOffset: sum.earOffset / n, tilt: sum.tilt / n, earRatio: sum.earRatio / n };
+  }
+
+  function finishSpin() {
+    spinning = false;
+    const front = averageMetrics(spinSamples.front);
+    const left = averageMetrics(spinSamples.left) || front;
+    const right = averageMetrics(spinSamples.right) || front;
+    baseline = { front, left, right };
+    spinStatus.textContent = `Calibration complete ✓ (front ${spinSamples.front.length}, left ${spinSamples.left.length}, right ${spinSamples.right.length} samples)`;
+    setTimeout(() => goToStep(stepIndex + 1), 1200);
+  }
+
+  async function doCapture(landmarks) {
+    capturing = true;
+    holdRing.style.display = "none";
+    const step = STEPS[stepIndex];
+    const viewBaseline = baseline ? baseline[step.id] : null;
+    const result = scorePosture(landmarks, viewBaseline);
+    const rawSnapshot = captureSnapshot();
+    const image = rawSnapshot
+      ? await annotateFrame(rawSnapshot, landmarks, result.issues, canvas.width, canvas.height)
+      : null;
+    captures[step.id] = { ...result, image };
+    capturing = false;
+    goToStep(stepIndex + 1);
+  }
+
   function renderResults() {
     const views = ["front", "left", "right"].filter((v) => captures[v]);
     const avgScore = Math.round((views.reduce((sum, v) => sum + captures[v].score, 0) / views.length) * 10) / 10;
+
+    document.getElementById("thumbGrid").innerHTML = views.map((v) => `
+      <div class="thumb-card">
+        <div class="thumb-img-wrap">
+          <span class="thumb-label">${v}</span>
+          ${captures[v].image ? `<img src="${captures[v].image}" alt="${v} view posture capture">` : ""}
+        </div>
+        <div class="thumb-meta"><span>SCORE</span><span>${captures[v].score.toFixed(1)}/10</span></div>
+      </div>
+    `).join("");
 
     const scoreValue = document.getElementById("scoreValue");
     scoreValue.textContent = avgScore.toFixed(1);
@@ -251,19 +385,13 @@
     scoreValue.className = "score-badge " + (label === "good" ? "score-good" : label === "fair" ? "score-warn" : "score-bad");
 
     document.getElementById("viewBreakdown").innerHTML = views.map((v) => `
-      <div class="view-score">
-        <span style="text-transform:capitalize;">${v} view</span>
-        <strong>${captures[v].score.toFixed(1)} / 10</strong>
-      </div>
+      <div class="view-score"><span style="text-transform:uppercase;">${v} view</span><strong>${captures[v].score.toFixed(1)} / 10</strong></div>
     `).join("");
 
-    // Merge issues across views, keeping the worst severity seen for each issue id
     const merged = {};
     views.forEach((v) => {
       captures[v].issues.forEach((issue) => {
-        if (!merged[issue.id] || issue.severity > merged[issue.id].severity) {
-          merged[issue.id] = issue;
-        }
+        if (!merged[issue.id] || issue.severity > merged[issue.id].severity) merged[issue.id] = issue;
       });
     });
     const issues = Object.values(merged).sort((a, b) => b.severity - a.severity);
@@ -281,8 +409,7 @@
     } else {
       issuesList.innerHTML = issues.map((i) => `
         <div class="issue-row"><strong style="color: var(--coral);">•</strong><span>${i.message}</span></div>
-      `).join("");
-      issuesList.innerHTML += `<p style="margin:10px 0 0; font-size:0.8rem; font-style:italic;">${DISCLAIMER}</p>`;
+      `).join("") + `<p style="margin:10px 0 0; font-size:0.8rem; font-style:italic;">${DISCLAIMER}</p>`;
 
       const topIssue = issues[0].id;
       exerciseList.innerHTML = renderExercises(EXERCISES[topIssue] || EXERCISES.good);
@@ -311,11 +438,7 @@
     return ordered.map((id) => {
       const cat = CARE_CATEGORIES.find((c) => c.id === id);
       if (!cat) return "";
-      return `
-        <a class="care-link" href="${mapsSearchUrl(cat.query)}" target="_blank" rel="noopener">
-          <span>${cat.label}</span><span class="care-arrow">→</span>
-        </a>
-      `;
+      return `<a class="care-link" href="${mapsSearchUrl(cat.query)}" target="_blank" rel="noopener"><span>${cat.label}</span><span class="care-arrow">→</span></a>`;
     }).join("");
   }
 </script>
