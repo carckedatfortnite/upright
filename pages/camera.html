@@ -8,17 +8,29 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css">
 <style>
-  .camera-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; padding: 40px 24px 80px; }
+  .camera-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; padding: 24px 24px 80px; }
   @media (max-width: 860px) { .camera-layout { grid-template-columns: 1fr; } }
   .video-wrap { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: #000; aspect-ratio: 4/3; }
   .video-wrap video { display: none; }
   .video-wrap canvas { width: 100%; height: 100%; display: block; }
   .status-pill { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,0.55); color: #fff; font-size: 0.8rem; padding: 5px 12px; border-radius: 20px; }
+
+  .stepper { display:flex; gap:8px; margin-bottom: 18px; }
+  .step-dot { width: 32px; height: 6px; border-radius: 3px; background: var(--border); }
+  .step-dot.done { background: var(--teal); }
+  .step-dot.current { background: var(--coral); }
+
   .issue-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .issue-row:last-child { border-bottom: none; }
   .exercise-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
   .exercise-item:last-child { border-bottom: none; }
   .dose { color: var(--teal); font-weight: 600; font-size: 0.85rem; }
+  .care-link { display:flex; justify-content: space-between; align-items:center; padding: 12px 0; border-bottom: 1px solid var(--border); text-decoration:none; color: inherit; }
+  .care-link:last-child { border-bottom: none; }
+  .care-link:hover .care-arrow { color: var(--teal-dark); }
+  .care-arrow { color: var(--teal); font-weight: 600; }
+  .view-score { display:flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .view-score:last-child { border-bottom: none; }
 </style>
 </head>
 <body>
@@ -36,11 +48,15 @@
 </nav>
 
 <div class="container" style="padding-top: 32px;">
-  <h2>Posture check</h2>
-  <p>Sit the way you normally would at your desk, then start the camera. Try a couple of positions — slouched, upright, leaning toward the screen — to see how the score responds.</p>
+  <h2 id="stepTitle">Posture check</h2>
+  <p id="stepInstruction">We'll walk through a quick 360° check: calibrate, then face the camera, then turn to each side, so the score reflects your posture from every angle — not just one.</p>
 </div>
 
-<div class="container camera-layout">
+<div class="container">
+  <div class="stepper" id="stepper"></div>
+</div>
+
+<div class="container camera-layout" id="captureLayout">
   <div>
     <div class="video-wrap">
       <video id="video" playsinline></video>
@@ -49,103 +65,136 @@
     </div>
     <div style="display:flex; gap:12px; margin-top: 16px; flex-wrap: wrap;">
       <button class="btn btn-primary" id="startBtn">Start camera</button>
-      <button class="btn btn-secondary" id="calibrateBtn" disabled>Calibrate (sit up straight first)</button>
-      <button class="btn btn-secondary" id="captureBtn" disabled>Capture score</button>
-      <button class="btn btn-secondary" id="resumeBtn" style="display:none;">Resume live</button>
+      <button class="btn btn-primary" id="actionBtn" style="display:none;">Calibrate</button>
     </div>
-    <p id="calibrationStatus" style="font-size:0.85rem; margin-top:8px;">Not calibrated yet — using generic thresholds (less accurate, especially from a front-facing camera).</p>
-    <a id="downloadLink" class="btn btn-secondary" style="display:none; margin-top: 12px;" download="posture-snapshot.png">Download snapshot</a>
   </div>
 
-  <div>
-    <div class="card" style="text-align:center; margin-bottom: 20px;">
-      <div id="scoreValue" class="score-badge score-warn">—</div>
-      <div id="scoreLabel" style="color: var(--ink-soft); font-weight: 600;">Waiting for a reading</div>
-    </div>
-
-    <div class="card" style="margin-bottom: 20px;">
-      <h3>What we're seeing</h3>
-      <div id="issuesList"><p>Start the camera to get feedback.</p></div>
-    </div>
-
-    <div class="card">
-      <h3>Recommended for you</h3>
-      <div id="exerciseList"><p>Exercises will appear here based on your posture check.</p></div>
-    </div>
+  <div class="card">
+    <h3>Why this step</h3>
+    <p id="whyText">Calibrating to your own neutral posture makes every later reading more accurate — slouching looks different on every body and every camera setup, so a generic threshold is a rough guess without this.</p>
   </div>
 </div>
 
-<footer><div class="container">Upright — built for the Congressional App Challenge.</div></footer>
+<div class="container" id="resultsLayout" style="display:none; padding: 0 24px 80px; display:grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+  <div>
+    <div class="card" style="text-align:center; margin-bottom: 20px;">
+      <div id="scoreValue" class="score-badge score-warn">—</div>
+      <div id="scoreLabel" style="color: var(--ink-soft); font-weight: 600;">Combined score across all 3 views</div>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+      <h3>Per-view breakdown</h3>
+      <div id="viewBreakdown"></div>
+    </div>
+
+    <div class="card">
+      <h3>What we're seeing</h3>
+      <div id="issuesList"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card" style="margin-bottom: 20px;">
+      <h3>Recommended exercises</h3>
+      <div id="exerciseList"></div>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+      <h3>Suggested screenings</h3>
+      <div id="screeningsList"></div>
+    </div>
+
+    <div class="card">
+      <h3>Find care near you</h3>
+      <div id="careLinks"></div>
+    </div>
+  </div>
+
+  <div style="grid-column: 1 / -1; text-align:center;">
+    <button class="btn btn-secondary" id="restartBtn">Start a new check</button>
+  </div>
+</div>
+
+<footer><div class="container">Upright — built by Gagan Girish for the Congressional App Challenge.</div></footer>
 
 <script type="module">
-  import { initPoseDetection, pausePoseDetection, resumePoseDetection, captureSnapshot } from "../js/pose-detection.js";
+  import { initPoseDetection } from "../js/pose-detection.js";
   import { scorePosture, computeMetrics } from "../js/scoring.js";
-  import { EXERCISES, awarenessLevel, DISCLAIMER } from "../js/exercises-data.js";
+  import {
+    EXERCISES, SCREENINGS, CARE_CATEGORIES, ISSUE_TO_CARE,
+    mapsSearchUrl, DISCLAIMER,
+  } from "../js/exercises-data.js";
+
+  const STEPS = [
+    {
+      id: "calibrate", title: "Step 1 — Calibrate",
+      instruction: "Sit up as straight and neutral as you feels natural, facing the camera. This becomes your personal baseline.",
+      why: "Calibrating to your own neutral posture makes every later reading more accurate — slouching looks different on every body and every camera setup, so a generic threshold is a rough guess without this.",
+      actionLabel: "Calibrate",
+    },
+    {
+      id: "front", title: "Step 2 — Front view",
+      instruction: "Now sit however feels normal to you — the way you'd actually sit while working, not posed. We'll capture this as your front-view reading.",
+      why: "Front view is the most common camera angle (laptop webcams, phone propped up) — the view most people actually use day to day.",
+      actionLabel: "Capture front view",
+    },
+    {
+      id: "left", title: "Step 3 — Left side",
+      instruction: "Turn your chair or body about 90° so the camera sees your left side, sitting naturally.",
+      why: "Side views are the most reliable angle for detecting forward head lean — the classic 'tech neck' posture shows up clearly here.",
+      actionLabel: "Capture left side",
+    },
+    {
+      id: "right", title: "Step 4 — Right side",
+      instruction: "Now turn the other way so the camera sees your right side.",
+      why: "Checking both sides catches asymmetric issues — like one shoulder riding higher than the other — that a single side can miss.",
+      actionLabel: "Capture right side",
+    },
+    { id: "results", title: "Your results", instruction: "", why: "" },
+  ];
+
+  let stepIndex = 0;
+  let baseline = null;
+  let latestLandmarks = null;
+  const captures = {}; // { front: result, left: result, right: result }
 
   const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
   const statusPill = document.getElementById("status");
   const startBtn = document.getElementById("startBtn");
-  const calibrateBtn = document.getElementById("calibrateBtn");
-  const calibrationStatus = document.getElementById("calibrationStatus");
-  const captureBtn = document.getElementById("captureBtn");
-  const resumeBtn = document.getElementById("resumeBtn");
-  const downloadLink = document.getElementById("downloadLink");
-  const scoreValue = document.getElementById("scoreValue");
-  const scoreLabel = document.getElementById("scoreLabel");
-  const issuesList = document.getElementById("issuesList");
-  const exerciseList = document.getElementById("exerciseList");
+  const actionBtn = document.getElementById("actionBtn");
+  const stepTitle = document.getElementById("stepTitle");
+  const stepInstruction = document.getElementById("stepInstruction");
+  const whyText = document.getElementById("whyText");
+  const stepperEl = document.getElementById("stepper");
+  const captureLayout = document.getElementById("captureLayout");
+  const resultsLayout = document.getElementById("resultsLayout");
 
-  // Smooth the score slightly so it doesn't jitter frame to frame
-  let smoothedScore = null;
-  let isPaused = false;
-  let baseline = null;      // set once the person calibrates
-  let latestLandmarks = null; // kept so the calibrate button can read "right now"
-
-  function render(result) {
-    if (isPaused) return; // frozen - ignore incoming frames until resumed
-    smoothedScore = smoothedScore === null ? result.score : smoothedScore * 0.85 + result.score * 0.15;
-    const displayScore = Math.round(smoothedScore * 10) / 10;
-
-    scoreValue.textContent = displayScore.toFixed(1);
-    scoreValue.className = "score-badge " + (result.label === "good" ? "score-good" : result.label === "fair" ? "score-warn" : "score-bad");
-    scoreLabel.textContent = result.label === "good" ? "Good posture" : result.label === "fair" ? "Room to improve" : "Needs attention";
-
-    if (result.issues.length === 0) {
-      issuesList.innerHTML = `<p style="margin:0;">No major issues detected in this position.</p>`;
-      exerciseList.innerHTML = renderExercises(EXERCISES.good);
-    } else {
-      issuesList.innerHTML = result.issues.map(i => `
-        <div class="issue-row">
-          <strong style="color: var(--coral);">•</strong>
-          <span>${i.message}</span>
-        </div>
-      `).join("");
-
-      const aware = awarenessLevel(result.issues);
-      issuesList.innerHTML += `
-        <div class="issue-row" style="margin-top:8px; padding-top:14px; border-top: 1px dashed var(--border);">
-          <div>
-            <strong>Awareness level: ${aware.level}</strong>
-            <p style="margin:4px 0 0;">${aware.detail}</p>
-            <p style="margin:6px 0 0; font-size:0.8rem; font-style:italic;">${DISCLAIMER}</p>
-          </div>
-        </div>
-      `;
-
-      const topIssue = result.issues[0].id;
-      exerciseList.innerHTML = renderExercises(EXERCISES[topIssue] || EXERCISES.good);
-    }
+  function renderStepper() {
+    stepperEl.innerHTML = STEPS.slice(0, 4).map((s, i) => {
+      const cls = i < stepIndex ? "done" : i === stepIndex ? "current" : "";
+      return `<div class="step-dot ${cls}"></div>`;
+    }).join("");
   }
 
-  function renderExercises(list) {
-    return list.map(ex => `
-      <div class="exercise-item">
-        <h3 style="margin-bottom:2px; font-size:1.05rem;">${ex.name}</h3>
-        <div class="dose">${ex.dose}</div>
-        <p style="margin:6px 0 0;">${ex.how}</p>
-      </div>
-    `).join("");
+  function goToStep(i) {
+    stepIndex = i;
+    const step = STEPS[i];
+    renderStepper();
+
+    if (step.id === "results") {
+      captureLayout.style.display = "none";
+      resultsLayout.style.display = "grid";
+      stepTitle.textContent = step.title;
+      stepInstruction.textContent = "";
+      renderResults();
+      return;
+    }
+
+    stepTitle.textContent = step.title;
+    stepInstruction.textContent = step.instruction;
+    whyText.textContent = step.why;
+    actionBtn.textContent = step.actionLabel;
   }
 
   startBtn.addEventListener("click", async () => {
@@ -156,52 +205,119 @@
         videoEl: video,
         canvasEl: canvas,
         onStatus: (s) => (statusPill.textContent = s),
-        onResult: (landmarks) => {
-          latestLandmarks = landmarks;
-          render(scorePosture(landmarks, baseline));
-        },
+        onResult: (landmarks) => { latestLandmarks = landmarks; },
       });
-      startBtn.textContent = "Camera running";
-      captureBtn.disabled = false;
-      calibrateBtn.disabled = false;
+      startBtn.style.display = "none";
+      actionBtn.style.display = "inline-flex";
+      goToStep(0);
     } catch (err) {
       statusPill.textContent = "Camera error";
       startBtn.textContent = "Try again";
       startBtn.disabled = false;
-      console.error(err);
       alert("Couldn't access the camera. Check permissions and try again.\n\n" + err.message);
     }
   });
 
-  calibrateBtn.addEventListener("click", () => {
-    if (!latestLandmarks) return;
-    baseline = computeMetrics(latestLandmarks);
-    calibrationStatus.textContent = "Calibrated to your neutral posture — scoring is now personalized and should work from any camera angle.";
-    calibrationStatus.style.color = "var(--good)";
-  });
-
-  captureBtn.addEventListener("click", () => {
-    isPaused = true;
-    pausePoseDetection();
-    statusPill.textContent = "Paused — score frozen";
-    captureBtn.style.display = "none";
-    resumeBtn.style.display = "inline-flex";
-
-    const dataUrl = captureSnapshot();
-    if (dataUrl) {
-      downloadLink.href = dataUrl;
-      downloadLink.style.display = "inline-flex";
+  actionBtn.addEventListener("click", () => {
+    if (!latestLandmarks) {
+      alert("Still waiting for a clear view of you — make sure you're fully in frame.");
+      return;
+    }
+    const step = STEPS[stepIndex];
+    if (step.id === "calibrate") {
+      baseline = computeMetrics(latestLandmarks);
+      goToStep(stepIndex + 1);
+    } else {
+      captures[step.id] = scorePosture(latestLandmarks, baseline);
+      goToStep(stepIndex + 1);
     }
   });
 
-  resumeBtn.addEventListener("click", () => {
-    isPaused = false;
-    resumePoseDetection();
-    statusPill.textContent = "Live";
-    captureBtn.style.display = "inline-flex";
-    resumeBtn.style.display = "none";
-    downloadLink.style.display = "none";
+  document.getElementById("restartBtn").addEventListener("click", () => {
+    Object.keys(captures).forEach((k) => delete captures[k]);
+    baseline = null;
+    resultsLayout.style.display = "none";
+    captureLayout.style.display = "grid";
+    goToStep(0);
   });
+
+  function renderResults() {
+    const views = ["front", "left", "right"].filter((v) => captures[v]);
+    const avgScore = Math.round((views.reduce((sum, v) => sum + captures[v].score, 0) / views.length) * 10) / 10;
+
+    const scoreValue = document.getElementById("scoreValue");
+    scoreValue.textContent = avgScore.toFixed(1);
+    const label = avgScore >= 7.5 ? "good" : avgScore >= 5 ? "fair" : "poor";
+    scoreValue.className = "score-badge " + (label === "good" ? "score-good" : label === "fair" ? "score-warn" : "score-bad");
+
+    document.getElementById("viewBreakdown").innerHTML = views.map((v) => `
+      <div class="view-score">
+        <span style="text-transform:capitalize;">${v} view</span>
+        <strong>${captures[v].score.toFixed(1)} / 10</strong>
+      </div>
+    `).join("");
+
+    // Merge issues across views, keeping the worst severity seen for each issue id
+    const merged = {};
+    views.forEach((v) => {
+      captures[v].issues.forEach((issue) => {
+        if (!merged[issue.id] || issue.severity > merged[issue.id].severity) {
+          merged[issue.id] = issue;
+        }
+      });
+    });
+    const issues = Object.values(merged).sort((a, b) => b.severity - a.severity);
+
+    const issuesList = document.getElementById("issuesList");
+    const exerciseList = document.getElementById("exerciseList");
+    const screeningsList = document.getElementById("screeningsList");
+    const careLinks = document.getElementById("careLinks");
+
+    if (issues.length === 0) {
+      issuesList.innerHTML = `<p style="margin:0;">No major issues detected across any view — nice.</p>`;
+      exerciseList.innerHTML = renderExercises(EXERCISES.good);
+      screeningsList.innerHTML = `<p style="margin:0;">${SCREENINGS.general}</p>`;
+      careLinks.innerHTML = renderCareLinks(["pt"]);
+    } else {
+      issuesList.innerHTML = issues.map((i) => `
+        <div class="issue-row"><strong style="color: var(--coral);">•</strong><span>${i.message}</span></div>
+      `).join("");
+      issuesList.innerHTML += `<p style="margin:10px 0 0; font-size:0.8rem; font-style:italic;">${DISCLAIMER}</p>`;
+
+      const topIssue = issues[0].id;
+      exerciseList.innerHTML = renderExercises(EXERCISES[topIssue] || EXERCISES.good);
+
+      screeningsList.innerHTML = issues.map((i) => `
+        <p style="margin:0 0 12px;"><strong style="text-transform:capitalize;">${i.id.replace("_", " ")}:</strong> ${SCREENINGS[i.id] || SCREENINGS.general}</p>
+      `).join("") + `<p style="margin:0; font-size:0.8rem; font-style:italic;">${DISCLAIMER}</p>`;
+
+      const careIds = [...new Set(issues.map((i) => ISSUE_TO_CARE[i.id] || "pt"))];
+      careLinks.innerHTML = renderCareLinks(careIds);
+    }
+  }
+
+  function renderExercises(list) {
+    return list.map((ex) => `
+      <div class="exercise-item">
+        <h3 style="margin-bottom:2px; font-size:1.05rem;">${ex.name}</h3>
+        <div class="dose">${ex.dose}</div>
+        <p style="margin:6px 0 0;">${ex.how}</p>
+      </div>
+    `).join("");
+  }
+
+  function renderCareLinks(ids) {
+    const ordered = [...ids, ...CARE_CATEGORIES.map((c) => c.id).filter((id) => !ids.includes(id))];
+    return ordered.map((id) => {
+      const cat = CARE_CATEGORIES.find((c) => c.id === id);
+      if (!cat) return "";
+      return `
+        <a class="care-link" href="${mapsSearchUrl(cat.query)}" target="_blank" rel="noopener">
+          <span>${cat.label}</span><span class="care-arrow">→</span>
+        </a>
+      `;
+    }).join("");
+  }
 </script>
 
 </body>

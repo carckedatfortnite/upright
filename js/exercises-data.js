@@ -1,16 +1,16 @@
 /**
  * exercises-data.js
  * Static content: exercises keyed by issue id (matches scoring.js issue ids),
- * and "awareness" copy for the risk-indicator feature.
+ * screening suggestions, nearby-care links, and "awareness" copy for the
+ * risk-indicator feature.
  *
- * NOTE ON THE RISK INDICATOR:
+ * NOTE ON THE RISK INDICATOR / SCREENINGS:
  * We deliberately do NOT present clinical probabilities (e.g. "62% chance of
  * developing cervical spondylosis"). A posture snapshot from a webcam cannot
- * support a number like that, and presenting one anyway would be misleading -
- * likely to draw exactly the kind of scrutiny you don't want from CAC judges.
- * Instead we show a plain-language AWARENESS LEVEL (Low/Moderate/Elevated)
- * tied to the visible posture pattern, always paired with the disclaimer
- * below. This keeps the feature honest while still being genuinely useful.
+ * support a number like that. Instead we show a plain-language AWARENESS
+ * LEVEL and point toward the kind of professional who could give a real
+ * assessment - always paired with a disclaimer. This keeps the feature
+ * honest while still being genuinely useful.
  */
 
 export const DISCLAIMER =
@@ -62,6 +62,39 @@ export const EXERCISES = {
     },
   ],
 };
+
+/** Suggested professional screenings per detected issue. These point
+ *  toward what a real evaluation could check - never a diagnosis. */
+export const SCREENINGS = {
+  forward_head:
+    "A postural assessment from a physical therapist can measure neck alignment more precisely than a camera, and check for early disc or nerve involvement if you notice numbness or tingling.",
+  ear_forward:
+    "A physical therapist or chiropractor can check for rounded-shoulder and upper-crossed muscle imbalance patterns that often accompany this.",
+  shoulder_tilt:
+    "Worth asking a doctor or physical therapist to check for scoliosis or muscle imbalance, especially if one shoulder sitting higher is new or getting more noticeable.",
+  general:
+    "A general posture screening — many physical therapists offer this as a first visit — is a low-cost way to get a professional baseline reading.",
+};
+
+/** Categories of nearby care, used to build "near me" map search links. */
+export const CARE_CATEGORIES = [
+  { id: "pt", label: "Physical therapists near me", query: "physical therapist" },
+  { id: "chiro", label: "Chiropractors near me", query: "chiropractor" },
+  { id: "ortho", label: "Orthopedic doctors near me", query: "orthopedic doctor" },
+];
+
+/** Which care category to lead with for a given issue id. */
+export const ISSUE_TO_CARE = {
+  forward_head: "pt",
+  ear_forward: "pt",
+  shoulder_tilt: "chiro",
+};
+
+/** Builds a Google Maps search URL for a query, biased toward the
+ *  browser's own location - no API key needed, works for any visitor. */
+export function mapsSearchUrl(query) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query + " near me")}`;
+}
 
 /** Maps an issue list (from scoring.js) to a plain-language awareness level.
  *  Never returns a numeric probability - see note above. */
