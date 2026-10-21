@@ -97,8 +97,22 @@
 
     <div style="margin-top: 16px;">
       <button class="btn btn-primary" id="startBtn">Start camera</button>
-      <button class="btn btn-primary" id="calibStartBtn" style="display:none;">Start calibration</button>
     </div>
+    <div id="calibButtons" style="display:none; margin-top:16px; display:grid; grid-template-columns: repeat(3,1fr); gap:10px;">
+      <div>
+        <button class="btn btn-secondary" id="calibFrontBtn" style="width:100%;">Calibrate front</button>
+        <p id="calibFrontStatus" style="margin:6px 0 0; font-size:0.78rem; font-family: var(--font-mono);">Not done</p>
+      </div>
+      <div>
+        <button class="btn btn-secondary" id="calibRightBtn" style="width:100%;">Calibrate right</button>
+        <p id="calibRightStatus" style="margin:6px 0 0; font-size:0.78rem; font-family: var(--font-mono);">Not done</p>
+      </div>
+      <div>
+        <button class="btn btn-secondary" id="calibLeftBtn" style="width:100%;">Calibrate left</button>
+        <p id="calibLeftStatus" style="margin:6px 0 0; font-size:0.78rem; font-family: var(--font-mono);">Not done</p>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="calibContinueBtn" style="display:none; margin-top:16px;">Continue to posture check →</button>
 
     <p style="margin-top:10px;">
       <button class="override-link" id="overrideBtn" style="display:none;">Trouble auto-detecting? Capture now instead</button>
@@ -161,9 +175,18 @@
   } from "../js/exercises-data.js";
 
   const HOLD_MS = 3000;
-  const SAMPLES_PER_CALIB_VIEW = 20;   // exactly equal for front/left/right
-  const GET_READY_MS = 1500;           // pause before each calibration hold so turning motion isn't sampled
+  const SAMPLES_PER_CALIB_VIEW = 150;  // exactly equal for front/left/right
   const SMOOTH_WINDOW = 8;             // frames averaged before classifying facing, to kill jitter
+
+  function speak(text) {
+    try {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel(); // don't queue up overlapping lines
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1.05;
+      window.speechSynthesis.speak(utter);
+    } catch (e) { /* speech not available - fail silently, calibration still works */ }
+  }
 
   const STEPS = [
     { id: "calibrate", title: "Step 1 — Calibration",
@@ -176,11 +199,11 @@
       why: "Checking both sides catches asymmetric issues — like one shoulder riding higher than the other — that a single side can miss." },
     { id: "results", title: "Your results" },
   ];
-  const CALIB_SUBSTEPS = [
-    { key: "front", label: "FRONT", instruction: "Face the camera directly." },
-    { key: "left", label: "LEFT", instruction: "Turn to show your LEFT side." },
-    { key: "right", label: "RIGHT", instruction: "Turn to show your RIGHT side." },
-  ];
+  const CALIB_DIRECTIONS = {
+    front: { label: "FRONT", instruction: "Face the camera directly." },
+    right: { label: "RIGHT", instruction: "Turn to show your RIGHT side." },
+    left: { label: "LEFT", instruction: "Turn to show your LEFT side." },
+  };
 
   let stepIndex = 0;
   let baseline = null;      // { front:{...}, left:{...}, right:{...} } posture metric baselines
@@ -190,12 +213,12 @@
   let holdStart = null;
   const captures = {};
 
-  // Calibration state
-  let calibrating = false;
-  let calibSubIndex = 0;
-  let calibPhase = "idle"; // "ready" | "collecting"
-  const calibSamples = { front: [], left: [], right: [] };     // computeMetrics() results
-  const calibSignals = { front: [], left: [], right: [] };     // computeFacingSignals() results
+  // Calibration state - one direction calibrated at a time, triggered by its own button
+  let calibActiveDirection = null; // "front" | "right" | "left" | null
+  let calibCollecting = false;
+  const calibSamples = { front: [], right: [], left: [] };     // computeMetrics() results
+  const calibSignals = { front: [], right: [], left: [] };     // computeFacingSignals() results
+  const calibDone = { front: false, right: false, left: false };
 
   // Rolling buffer for smoothing live facing signals during capture steps
   let signalHistory = [];
@@ -212,7 +235,14 @@
   const holdCaption = document.getElementById("holdCaption");
   const holdBarFill = document.getElementById("holdBarFill");
   const startBtn = document.getElementById("startBtn");
-  const calibStartBtn = document.getElementById("calibStartBtn");
+  const calibButtons = document.getElementById("calibButtons");
+  const calibFrontBtn = document.getElementById("calibFrontBtn");
+  const calibRightBtn = document.getElementById("calibRightBtn");
+  const calibLeftBtn = document.getElementById("calibLeftBtn");
+  const calibFrontStatus = document.getElementById("calibFrontStatus");
+  const calibRightStatus = document.getElementById("calibRightStatus");
+  const calibLeftStatus = document.getElementById("calibLeftStatus");
+  const calibContinueBtn = document.getElementById("calibContinueBtn");
   const overrideBtn = document.getElementById("overrideBtn");
   const stepTitle = document.getElementById("stepTitle");
   const stepInstruction = document.getElementById("stepInstruction");
@@ -258,8 +288,9 @@
     whyText.textContent = step.why;
 
     if (step.id === "calibrate") {
-      stepInstruction.textContent = "Three quick holds: front, then left, then right. Stay still during each — we'll tell you when to turn.";
-      calibStartBtn.style.display = "inline-flex";
+      stepInstruction.textContent = "Calibrate each direction one at a time, in any order. Press a button, get ready during the 3-2-1 countdown, then hold still while it samples.";
+      calibButtons.style.display = "grid";
+      calibContinueBtn.style.display = calibDone.front && calibDone.right && calibDone.left ? "inline-flex" : "none";
     } else {
       stepInstruction.textContent = `Turn to show the camera your ${step.facing === "front" ? "front" : step.facing + " side"}. Hold still once you're there — it captures automatically.`;
       facingPill.style.display = "inline-block";
@@ -283,26 +314,58 @@
     }
   });
 
-  calibStartBtn.addEventListener("click", () => {
-    calibStartBtn.style.display = "none";
-    calibrating = true;
-    calibSubIndex = 0;
-    calibSamples.front = []; calibSamples.left = []; calibSamples.right = [];
-    calibSignals.front = []; calibSignals.left = []; calibSignals.right = [];
-    enterGetReady();
+  const calibBtnByDirection = { front: calibFrontBtn, right: calibRightBtn, left: calibLeftBtn };
+  const calibStatusByDirection = { front: calibFrontStatus, right: calibRightStatus, left: calibLeftStatus };
+
+  [calibFrontBtn, calibRightBtn, calibLeftBtn].forEach((btn, i) => {
+    const direction = ["front", "right", "left"][i];
+    btn.addEventListener("click", () => startDirectionCalibration(direction));
   });
 
-  function enterGetReady() {
-    calibPhase = "ready";
-    const sub = CALIB_SUBSTEPS[calibSubIndex];
+  function startDirectionCalibration(direction) {
+    if (calibActiveDirection) return; // one at a time
+    calibActiveDirection = direction;
+    calibCollecting = false;
+    calibSamples[direction] = [];
+    calibSignals[direction] = [];
+    Object.values(calibBtnByDirection).forEach((b) => (b.disabled = true));
+    calibContinueBtn.style.display = "none";
+
+    const dir = CALIB_DIRECTIONS[direction];
     centerBanner.style.display = "flex";
-    centerBannerText.textContent = `GET READY: ${sub.label}`;
-    stepInstruction.textContent = sub.instruction + " Hold still once you're there.";
-    setTimeout(() => {
-      calibPhase = "collecting";
-      centerBannerText.textContent = `HOLDING ${sub.label}…`;
-    }, GET_READY_MS);
+    stepInstruction.textContent = dir.instruction + " Get ready…";
+
+    let count = 3;
+    centerBannerText.textContent = String(count);
+    const countdownTimer = setInterval(() => {
+      count--;
+      if (count > 0) {
+        centerBannerText.textContent = String(count);
+      } else {
+        clearInterval(countdownTimer);
+        centerBannerText.textContent = `HOLDING ${dir.label}… 0/${SAMPLES_PER_CALIB_VIEW}`;
+        calibCollecting = true;
+      }
+    }, 1000);
   }
+
+  function finishDirectionCalibration(direction) {
+    calibCollecting = false;
+    calibActiveDirection = null;
+    centerBanner.style.display = "none";
+    calibDone[direction] = true;
+    calibStatusByDirection[direction].textContent = `✓ Done (${calibSamples[direction].length} samples)`;
+    calibBtnByDirection[direction].textContent = `Recalibrate ${direction}`;
+    Object.values(calibBtnByDirection).forEach((b) => (b.disabled = false));
+    speak("Picture taken");
+
+    if (calibDone.front && calibDone.right && calibDone.left) {
+      buildBaselineAndCentroids();
+      calibContinueBtn.style.display = "inline-flex";
+    }
+  }
+
+  calibContinueBtn.addEventListener("click", () => goToStep(stepIndex + 1));
 
   overrideBtn.addEventListener("click", () => {
     if (latestLandmarks && !capturing) doCapture(latestLandmarks);
@@ -312,6 +375,14 @@
     Object.keys(captures).forEach((k) => delete captures[k]);
     baseline = null;
     centroids = null;
+    ["front", "right", "left"].forEach((d) => {
+      calibDone[d] = false;
+      calibSamples[d] = [];
+      calibSignals[d] = [];
+      calibBtnByDirection[d].textContent = `Calibrate ${d}`;
+      calibBtnByDirection[d].disabled = false;
+      calibStatusByDirection[d].textContent = "Not done";
+    });
     resultsLayout.style.display = "none";
     captureLayout.style.display = "grid";
     goToStep(0);
@@ -322,19 +393,14 @@
     const step = STEPS[stepIndex];
 
     if (step.id === "calibrate") {
-      if (!calibrating || calibPhase !== "collecting") return;
-      const sub = CALIB_SUBSTEPS[calibSubIndex];
-      calibSamples[sub.key].push(computeMetrics(landmarks));
-      calibSignals[sub.key].push(computeFacingSignals(landmarks));
-      const count = calibSamples[sub.key].length;
-      centerBannerText.textContent = `HOLDING ${sub.label}… ${count}/${SAMPLES_PER_CALIB_VIEW}`;
+      if (!calibCollecting || !calibActiveDirection) return;
+      const direction = calibActiveDirection;
+      calibSamples[direction].push(computeMetrics(landmarks));
+      calibSignals[direction].push(computeFacingSignals(landmarks));
+      const count = calibSamples[direction].length;
+      centerBannerText.textContent = `HOLDING ${CALIB_DIRECTIONS[direction].label}… ${count}/${SAMPLES_PER_CALIB_VIEW}`;
       if (count >= SAMPLES_PER_CALIB_VIEW) {
-        calibSubIndex++;
-        if (calibSubIndex >= CALIB_SUBSTEPS.length) {
-          finishCalibration();
-        } else {
-          enterGetReady();
-        }
+        finishDirectionCalibration(direction);
       }
       return;
     }
@@ -393,10 +459,7 @@
     return { earRatio: sum.earRatio / n, shoulderZDiff: sum.shoulderZDiff / n };
   }
 
-  function finishCalibration() {
-    calibrating = false;
-    centerBanner.style.display = "none";
-
+  function buildBaselineAndCentroids() {
     const front = averageMetrics(calibSamples.front);
     baseline = {
       front,
@@ -410,8 +473,6 @@
       left: averageSignals(calibSignals.left) || sigFront,
       right: averageSignals(calibSignals.right) || sigFront,
     };
-
-    goToStep(stepIndex + 1);
   }
 
   async function doCapture(landmarks) {
